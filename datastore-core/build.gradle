@@ -14,24 +14,45 @@
  * limitations under the License.
  */
 
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
 
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.4.20"
+    id("org.jetbrains.kotlin.multiplatform") version "1.4.20"
 }
 
-dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
-    api("androidx.annotation:annotation:1.1.0")
+kotlin {
+    jvm()
 
-    testImplementation("junit:junit:4.13.1")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.4.2")
-    testImplementation("com.google.truth:truth:1.1")
-    testImplementation(project(":internal-testutils-truth"))
+    sourceSets {
+        commonMain {
+            dependencies {
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.4.2")
+            }
+        }
+        jvmMain {
+            dependencies {
+                api("androidx.annotation:annotation:1.1.0")
+            }
+        }
+        jvmTest {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("junit:junit:4.13.1")
+                implementation("com.google.truth:truth:1.1")
+                implementation(project(":internal-testutils-truth"))
+            }
+        }
+    }
 }
 
 // Allow usage of Kotlin's @OptIn.
-tasks.withType(KotlinCompile).configureEach {
+tasks.withType(AbstractKotlinCompile).configureEach {
     kotlinOptions {
         freeCompilerArgs += ["-Xopt-in=kotlin.RequiresOptIn"]
     }
