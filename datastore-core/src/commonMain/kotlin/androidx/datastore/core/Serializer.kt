@@ -16,9 +16,9 @@
 
 package androidx.datastore.core
 
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import okio.IOException
+import okio.Sink
+import okio.Source
 
 /**
  * The serializer determines the on-disk format and API for accessing it.
@@ -39,7 +39,7 @@ public interface Serializer<T> {
      *
      * @param input the InputStream with the data to deserialize
      */
-    public fun readFrom(input: InputStream): T
+    public fun readFrom(input: Source): T
 
     /**
      *  Marshal object to a stream. Closing the provided OutputStream is a no-op.
@@ -47,7 +47,7 @@ public interface Serializer<T> {
      *  @param t the data to write to output
      *  @output the OutputStream to serialize data to
      */
-    public fun writeTo(t: T, output: OutputStream)
+    public fun writeTo(t: T, output: Sink)
 }
 
 /**
@@ -56,4 +56,4 @@ public interface Serializer<T> {
  * due to a transient IO issue or permissions issue.
  */
 public class CorruptionException(message: String, cause: Throwable? = null) :
-    IOException(message, cause)
+    IOException(message) // FIXME pass cause to parent (needs to be in common okio.IOException)

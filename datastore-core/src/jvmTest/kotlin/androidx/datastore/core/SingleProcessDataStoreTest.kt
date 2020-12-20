@@ -32,6 +32,11 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
+import okio.Filesystem
+import okio.IOException
+import okio.Sink
+import okio.Source
+import okio.toOkioPath
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -40,9 +45,6 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import java.io.File
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
 import java.lang.IllegalStateException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -68,7 +70,7 @@ class SingleProcessDataStoreTest {
         dataStoreScope = TestCoroutineScope(TestCoroutineDispatcher() + Job())
         store =
             SingleProcessDataStore<Byte>(
-                { testFile },
+                { testFile.toOkioPath() },
                 testingSerializer,
                 scope = dataStoreScope
             )
@@ -213,11 +215,11 @@ class SingleProcessDataStoreTest {
     fun testExceptionWhenCreatingFilePropagates() = runBlockingTest {
         var failFileProducer = true
 
-        val fileProducer = {
+        val fileProducer = { _: Filesystem ->
             if (failFileProducer) {
                 throw IOException("Exception when producing file")
             }
-            testFile
+            testFile.toOkioPath()
         }
 
         val newStore = SingleProcessDataStore(
@@ -638,7 +640,7 @@ class SingleProcessDataStoreTest {
         val dataStore = DataStoreFactory.create(
             serializer = ByteWrapper.ByteWrapperSerializer(),
             scope = dataStoreScope
-        ) { testFile }
+        ) { testFile.toOkioPath() }
 
         assertThrows<IllegalStateException> {
             dataStore.updateData { input: ByteWrapper ->
@@ -654,7 +656,7 @@ class SingleProcessDataStoreTest {
         val dataStore = DataStoreFactory.create(
             serializer = TestingSerializer(defaultValue = 99),
             scope = dataStoreScope
-        ) { testFile }
+        ) { testFile.toOkioPath() }
 
         assertThat(testFile.delete()).isTrue()
 
@@ -665,7 +667,7 @@ class SingleProcessDataStoreTest {
     fun testClosingOutputStreamDoesntCloseUnderlyingStream() = runBlockingTest {
         val delegate = TestingSerializer()
         val serializer = object : Serializer<Byte> by delegate {
-            override fun writeTo(t: Byte, output: OutputStream) {
+            override fun writeTo(t: Byte, output: Sink) {
                 delegate.writeTo(t, output)
                 output.close() // This will be a no-op so the fd.sync() call will succeed.
             }
@@ -687,11 +689,11 @@ class SingleProcessDataStoreTest {
 
             override val defaultValue = ByteWrapper(delegate.defaultValue)
 
-            override fun readFrom(input: InputStream): ByteWrapper {
+            override fun readFrom(input: Source): ByteWrapper {
                 return ByteWrapper(delegate.readFrom(input))
             }
 
-            override fun writeTo(t: ByteWrapper, output: OutputStream) {
+            override fun writeTo(t: ByteWrapper, output: Sink) {
                 delegate.writeTo(t.byte, output)
             }
         }
@@ -723,7 +725,7 @@ class SingleProcessDataStoreTest {
         corruptionHandler: CorruptionHandler<Byte> = NoOpCorruptionHandler<Byte>()
     ): DataStore<Byte> {
         return SingleProcessDataStore(
-            { file },
+            { file.toOkioPath() },
             serializer = serializer,
             scope = scope,
             initTasksList = initTasksList,

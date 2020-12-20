@@ -20,8 +20,11 @@ import androidx.datastore.core.handlers.NoOpCorruptionHandler
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
-import java.io.File
+import okio.Filesystem
+import okio.Path
+import kotlin.jvm.JvmOverloads
 
 /**
  * Public factory for creating DataStore instances.
@@ -57,13 +60,15 @@ public object DataStoreFactory {
         corruptionHandler: ReplaceFileCorruptionHandler<T>? = null,
         migrations: List<DataMigration<T>> = listOf(),
         scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-        produceFile: () -> File
+        filesystem: Filesystem = Filesystem.SYSTEM,
+        produceFile: (Filesystem) -> Path
     ): DataStore<T> =
         SingleProcessDataStore(
             produceFile = produceFile,
             serializer = serializer,
             corruptionHandler = corruptionHandler ?: NoOpCorruptionHandler(),
             initTasksList = listOf(DataMigrationInitializer.getInitializer(migrations)),
-            scope = scope
+            scope = scope,
+            filesystem = filesystem
         )
 }

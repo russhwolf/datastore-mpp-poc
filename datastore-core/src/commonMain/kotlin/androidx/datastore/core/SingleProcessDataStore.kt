@@ -16,18 +16,21 @@
 package androidx.datastore.core
 
 import androidx.datastore.core.handlers.NoOpCorruptionHandler
+import kotlinx.atomicfu.AtomicRef
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel.Factory.UNLIMITED
 import kotlinx.coroutines.channels.ConflatedBroadcastChannel
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.completeWith
+import kotlinx.coroutines.externalized.channels.actor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.emitAll
@@ -37,14 +40,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileNotFoundException
-import java.io.FileOutputStream
-import java.io.IOException
-import java.io.OutputStream
-import java.lang.IllegalStateException
-import java.util.concurrent.atomic.AtomicReference
+import okio.Buffer
+import okio.Filesystem
+import okio.IOException
+import okio.Path
+import okio.Path.Companion.toPath
+import okio.Sink
+import okio.Timeout
+import okio.externalized.use
 
 private class DataAndHash<T>(val value: T, val hashCode: Int) {
     fun checkHashCode() {
@@ -59,7 +62,7 @@ private class DataAndHash<T>(val value: T, val hashCode: Int) {
  */
 @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class, FlowPreview::class)
 internal class SingleProcessDataStore<T>(
-    private val produceFile: () -> File,
+    private val produceFile: (Filesystem) -> Path,
     private val serializer: Serializer<T>,
     /**
      * The list of initialization tasks to perform. These tasks will be completed before any data
@@ -70,7 +73,8 @@ internal class SingleProcessDataStore<T>(
      */
     initTasksList: List<suspend (api: InitializerApi<T>) -> Unit> = emptyList(),
     private val corruptionHandler: CorruptionHandler<T> = NoOpCorruptionHandler<T>(),
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+    private val filesystem: Filesystem = Filesystem.SYSTEM
 ) : DataStore<T> {
 
     override val data: Flow<T> = flow {
@@ -98,7 +102,7 @@ internal class SingleProcessDataStore<T>(
 
     private val SCRATCH_SUFFIX = ".tmp"
 
-    private val file: File by lazy { produceFile() }
+    private val file: Path by lazy { produceFile(filesystem) }
 
     /**
      * The external facing channel. The data flow emits the values from this channel.
@@ -107,8 +111,8 @@ internal class SingleProcessDataStore<T>(
      * current on disk data. If the read fails, downStreamChannel will be closed with that cause,
      * and a new instance will be set in its place.
      */
-    private val downstreamChannel: AtomicReference<ConflatedBroadcastChannel<DataAndHash<T>>> =
-        AtomicReference(ConflatedBroadcastChannel())
+    private val downstreamChannel: AtomicRef<ConflatedBroadcastChannel<DataAndHash<T>>> =
+        atomic(ConflatedBroadcastChannel())
 
     private var initTasks: List<suspend (api: InitializerApi<T>) -> Unit>? =
         initTasksList.toList()
@@ -245,11 +249,11 @@ internal class SingleProcessDataStore<T>(
 
     private suspend fun readData(): T {
         try {
-            FileInputStream(file).use { stream ->
-                return serializer.readFrom(stream)
+            filesystem.source(file).use { source ->
+                return serializer.readFrom(source)
             }
-        } catch (ex: FileNotFoundException) {
-            if (file.exists()) {
+        } catch (ex: IOException) {
+            if (filesystem.exists(file)) {
                 throw ex
             }
             return serializer.defaultValue
@@ -290,57 +294,51 @@ internal class SingleProcessDataStore<T>(
     internal fun writeData(newData: T) {
         file.createParentDirectories()
 
-        val scratchFile = File(file.absolutePath + SCRATCH_SUFFIX)
+        val scratchFile = (file.name + SCRATCH_SUFFIX).toPath()
         try {
-            FileOutputStream(scratchFile).use { stream ->
-                serializer.writeTo(newData, UncloseableOutputStream(stream))
-                stream.fd.sync()
+            filesystem.sink(scratchFile).use { sink ->
+                serializer.writeTo(newData, UncloseableOutputStream(sink))
+                // FIXME what is equivalent to stream.fd.sync (for stream a FileOutputStream)?
+    //            stream.fd.sync()
                 // TODO(b/151635324): fsync the directory, otherwise a badly timed crash could
                 //  result in reverting to a previous state.
             }
 
-            if (!scratchFile.renameTo(file)) {
+            try {
+                filesystem.atomicMove(scratchFile, file)
+            } catch (exception: IOException) {
                 throw IOException(
                     "Unable to rename $scratchFile." +
-                        "This likely means that there are multiple instances of DataStore " +
-                        "for this file. Ensure that you are only creating a single instance of " +
-                        "datastore for this file."
+                            "This likely means that there are multiple instances of DataStore " +
+                            "for this file. Ensure that you are only creating a single instance of " +
+                            "datastore for this file.",
                 )
             }
         } catch (ex: IOException) {
-            if (scratchFile.exists()) {
-                scratchFile.delete() // Swallow failure to delete
+            if (filesystem.exists(file)) {
+                try {
+                    filesystem.delete(scratchFile)
+                } catch (_: IOException) {
+                    // Swallow failure to delete
+                }
             }
             throw ex
         }
     }
 
-    private fun File.createParentDirectories() {
-        val parent: File? = canonicalFile.parentFile
+    private fun Path.createParentDirectories() {
+        val parent: Path? = file.parent
 
         parent?.let {
-            it.mkdirs()
-            if (!it.isDirectory) {
+            filesystem.mkdirs(it)
+            if (!filesystem.metadata(it).isDirectory) {
                 throw IOException("Unable to create parent directories of $this")
             }
         }
     }
 
     // Wrapper on FileOutputStream to prevent closing the underlying OutputStream.
-    private class UncloseableOutputStream(val fileOutputStream: FileOutputStream) : OutputStream() {
-
-        override fun write(b: Int) {
-            fileOutputStream.write(b)
-        }
-
-        override fun write(b: ByteArray) {
-            fileOutputStream.write(b)
-        }
-
-        override fun write(bytes: ByteArray, off: Int, len: Int) {
-            fileOutputStream.write(bytes, off, len)
-        }
-
+    private class UncloseableOutputStream(val fileOutputStream: Sink) : Sink {
         override fun close() {
             // We will not close the underlying FileOutputStream until after we're done syncing
             // the fd. This is useful for things like b/173037611.
@@ -349,11 +347,39 @@ internal class SingleProcessDataStore<T>(
         override fun flush() {
             fileOutputStream.flush()
         }
+
+        override fun timeout(): Timeout {
+            return fileOutputStream.timeout()
+        }
+
+        override fun write(source: Buffer, byteCount: Long) {
+            fileOutputStream.write(source, byteCount)
+        }
     }
 
     // Convenience function:
     @Suppress("NOTHING_TO_INLINE")
     private inline fun downstreamChannel(): ConflatedBroadcastChannel<DataAndHash<T>> {
-        return downstreamChannel.get()
+        return downstreamChannel.value
+    }
+}
+
+// FIXME is this correct replacement for File.exists()?
+private fun Filesystem.exists(file: Path): Boolean {
+    val parent = file.parent
+    return parent == null || exists(parent) && file in list(parent)
+}
+
+// FIXME is there a better way to do this?
+private fun Filesystem.mkdirs(path: Path) {
+    val parent = path.parent
+    when {
+        exists(path) -> return
+        parent == null -> error("tried to create root")
+        exists(parent) -> createDirectory(path)
+        else -> {
+            mkdirs(parent)
+            createDirectory(path)
+        }
     }
 }

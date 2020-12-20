@@ -24,12 +24,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
+import okio.IOException
+import okio.toOkioPath
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.io.IOException
 
 @kotlinx.coroutines.ExperimentalCoroutinesApi
 @kotlinx.coroutines.InternalCoroutinesApi
@@ -51,7 +52,7 @@ class ReplaceFileCorruptionHandlerTest {
         preSeedData(testFile, 1)
 
         val store = SingleProcessDataStore<Byte>(
-            { testFile },
+            { testFile.toOkioPath() },
             TestingSerializer(failReadWithCorruptionException = true),
             corruptionHandler = ReplaceFileCorruptionHandler<Byte> { 10 },
             scope = TestCoroutineScope()
@@ -65,7 +66,7 @@ class ReplaceFileCorruptionHandlerTest {
         preSeedData(testFile, 1)
 
         val store = SingleProcessDataStore<Byte>(
-            { testFile },
+            { testFile.toOkioPath() },
             TestingSerializer(failReadWithCorruptionException = true),
             corruptionHandler = ReplaceFileCorruptionHandler<Byte> { 10 },
             scope = TestCoroutineScope()
@@ -79,7 +80,7 @@ class ReplaceFileCorruptionHandlerTest {
         preSeedData(testFile, 1)
 
         val store = SingleProcessDataStore<Byte>(
-            { testFile },
+            { testFile.toOkioPath() },
             TestingSerializer(failReadWithCorruptionException = true),
             corruptionHandler = ReplaceFileCorruptionHandler<Byte> { 10 },
             scope = TestCoroutineScope()
@@ -99,7 +100,7 @@ class ReplaceFileCorruptionHandlerTest {
         preSeedData(testFile, 1)
 
         val store = SingleProcessDataStore<Byte>(
-            { testFile },
+            { testFile.toOkioPath() },
             TestingSerializer(failReadWithCorruptionException = true, failingWrite = true),
             corruptionHandler = ReplaceFileCorruptionHandler<Byte> { 10 },
             scope = TestCoroutineScope()
@@ -113,7 +114,7 @@ class ReplaceFileCorruptionHandlerTest {
 
     private suspend fun preSeedData(file: File, byte: Byte) {
         SingleProcessDataStore(
-            { file },
+            { file.toOkioPath() },
             TestingSerializer(),
             scope = TestCoroutineScope()
         ).updateData { byte }

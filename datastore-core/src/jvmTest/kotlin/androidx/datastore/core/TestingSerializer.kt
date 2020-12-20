@@ -16,9 +16,10 @@
 
 package androidx.datastore.core
 
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
+import okio.IOException
+import okio.Sink
+import okio.Source
+import okio.buffer
 
 internal class TestingSerializer(
     @Volatile var failReadWithCorruptionException: Boolean = false,
@@ -26,7 +27,7 @@ internal class TestingSerializer(
     @Volatile var failingWrite: Boolean = false,
     override val defaultValue: Byte = 0
 ) : Serializer<Byte> {
-    override fun readFrom(input: InputStream): Byte {
+    override fun readFrom(input: Source): Byte {
         if (failReadWithCorruptionException) {
             throw CorruptionException(
                 "CorruptionException",
@@ -38,17 +39,18 @@ internal class TestingSerializer(
             throw IOException("I was asked to fail on reads")
         }
 
-        val read = input.read()
-        if (read == -1) {
-            return 0
-        }
-        return read.toByte()
+        val buffer = input.buffer()
+        return if (buffer.exhausted()) {
+            0
+        } else {
+            buffer.readByte()
+        }.also { buffer.close() }
     }
 
-    override fun writeTo(t: Byte, output: OutputStream) {
+    override fun writeTo(t: Byte, output: Sink) {
         if (failingWrite) {
             throw IOException("I was asked to fail on writes")
         }
-        output.write(t.toInt())
+        output.buffer().writeByte(t.toInt()).close()
     }
 }

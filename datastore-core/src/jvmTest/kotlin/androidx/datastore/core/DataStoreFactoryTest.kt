@@ -21,6 +21,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
+import okio.toOkioPath
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -49,7 +50,7 @@ class DataStoreFactoryTest {
         val store = DataStoreFactory.create(
             serializer = TestingSerializer(),
             scope = dataStoreScope
-        ) { testFile }
+        ) { testFile.toOkioPath() }
 
         val expectedByte = 123.toByte()
 
@@ -71,7 +72,7 @@ class DataStoreFactoryTest {
                 valueToReplace
             },
             scope = dataStoreScope
-        ) { testFile }
+        ) { testFile.toOkioPath() }
 
         assertThat(store.data.first()).isEqualTo(valueToReplace)
     }
@@ -97,7 +98,7 @@ class DataStoreFactoryTest {
             serializer = TestingSerializer(),
             migrations = listOf(migratePlus2, migrateMinus1),
             scope = dataStoreScope
-        ) { testFile }
+        ) { testFile.toOkioPath() }
 
         assertThat(store.data.first()).isEqualTo(migratedByte)
     }

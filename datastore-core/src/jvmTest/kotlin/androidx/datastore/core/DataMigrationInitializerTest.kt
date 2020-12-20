@@ -23,12 +23,13 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
+import okio.IOException
+import okio.toOkioPath
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.io.IOException
 
 @kotlinx.coroutines.ExperimentalCoroutinesApi
 @kotlinx.coroutines.InternalCoroutinesApi
@@ -189,7 +190,7 @@ class DataMigrationInitializerTest {
         serializer: TestingSerializer = TestingSerializer()
     ): DataStore<Byte> {
         return SingleProcessDataStore(
-            { testFile },
+            { testFile.toOkioPath() },
             serializer = serializer,
             scope = TestCoroutineScope(),
             initTasksList = initTasksList

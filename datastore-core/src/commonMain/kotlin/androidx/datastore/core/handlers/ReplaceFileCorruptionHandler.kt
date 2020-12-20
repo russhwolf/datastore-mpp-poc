@@ -18,8 +18,7 @@ package androidx.datastore.core.handlers
 
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.CorruptionHandler
-import java.io.IOException
-import kotlin.jvm.Throws
+import okio.IOException
 
 /**
  * A corruption handler that attempts to replace the on-disk data with data from produceNewData.
