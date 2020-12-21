@@ -35,7 +35,6 @@ public class ReplaceFileCorruptionHandler<T>(
     private val produceNewData: (CorruptionException) -> T
 ) : CorruptionHandler<T> {
 
-    @Throws(IOException::class)
     override suspend fun handleCorruption(ex: CorruptionException): T {
         return produceNewData(ex)
     }

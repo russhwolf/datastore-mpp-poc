@@ -16,6 +16,8 @@
 
 package androidx.datastore.core
 
+import kotlin.coroutines.cancellation.CancellationException
+
 /**
  * CorruptionHandlers allow recovery from corruption that prevents reading data from the file (as
  * indicated by a CorruptionException).
@@ -31,5 +33,6 @@ public interface CorruptionHandler<T> {
      * @param ex is the exception encountered when attempting to deserialize data from disk.
      * @return The value that DataStore should attempt to write to disk.
      **/
+    @Throws(CorruptionException::class, CancellationException::class)
     public suspend fun handleCorruption(ex: CorruptionException): T
 }

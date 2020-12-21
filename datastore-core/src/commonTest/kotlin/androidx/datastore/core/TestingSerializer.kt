@@ -20,6 +20,7 @@ import okio.IOException
 import okio.Sink
 import okio.Source
 import okio.buffer
+import kotlin.jvm.Volatile
 
 internal class TestingSerializer(
     @Volatile var failReadWithCorruptionException: Boolean = false,

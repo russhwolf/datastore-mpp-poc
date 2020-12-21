@@ -23,7 +23,6 @@ import androidx.datastore.core.CorruptionHandler
  */
 internal class NoOpCorruptionHandler<T> : CorruptionHandler<T> {
 
-    @Throws(CorruptionException::class)
     override suspend fun handleCorruption(ex: CorruptionException): T {
         throw ex
     }
