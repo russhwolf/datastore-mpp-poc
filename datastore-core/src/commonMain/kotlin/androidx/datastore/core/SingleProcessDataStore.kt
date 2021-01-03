@@ -330,7 +330,7 @@ internal class SingleProcessDataStore<T>(
         val parent: Path? = file.parent
 
         parent?.let {
-            filesystem.mkdirs(it)
+            filesystem.createDirectories(it)
             if (!filesystem.metadata(it).isDirectory) {
                 throw IOException("Unable to create parent directories of $this")
             }
@@ -361,25 +361,5 @@ internal class SingleProcessDataStore<T>(
     @Suppress("NOTHING_TO_INLINE")
     private inline fun downstreamChannel(): ConflatedBroadcastChannel<DataAndHash<T>> {
         return downstreamChannel.value
-    }
-}
-
-// FIXME is this correct replacement for File.exists()?
-private fun Filesystem.exists(file: Path): Boolean {
-    val parent = file.parent
-    return parent == null || exists(parent) && file in list(parent)
-}
-
-// FIXME is there a better way to do this?
-private fun Filesystem.mkdirs(path: Path) {
-    val parent = path.parent
-    when {
-        exists(path) -> return
-        parent == null -> error("tried to create root")
-        exists(parent) -> createDirectory(path)
-        else -> {
-            mkdirs(parent)
-            createDirectory(path)
-        }
     }
 }
