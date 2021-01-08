@@ -5,7 +5,7 @@ import okio.Path.Companion.toPath
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.runBlocking
-import okio.Filesystem
+import okio.FileSystem
 
 // Since the original tests are still just running in the JVM, here's a quick proof-of-concept to verify that things
 // work from common
@@ -20,6 +20,6 @@ class CommonTestPlayground {
 
         assertEquals(3, dataStore.data.first())
 
-        Filesystem.SYSTEM.delete(dataStorePath)
+        FileSystem.SYSTEM.delete(dataStorePath)
     }
 }

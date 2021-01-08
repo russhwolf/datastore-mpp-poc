@@ -32,11 +32,11 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
-import okio.Filesystem
+import okio.FileSystem
 import okio.IOException
 import okio.Sink
 import okio.Source
-import okio.toOkioPath
+import okio.Path.Companion.toOkioPath
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -215,7 +215,7 @@ class SingleProcessDataStoreTest {
     fun testExceptionWhenCreatingFilePropagates() = runBlockingTest {
         var failFileProducer = true
 
-        val fileProducer = { _: Filesystem ->
+        val fileProducer = { _: FileSystem ->
             if (failFileProducer) {
                 throw IOException("Exception when producing file")
             }

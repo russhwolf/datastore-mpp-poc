@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
 import okio.IOException
-import okio.toOkioPath
+import okio.Path.Companion.toOkioPath
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test

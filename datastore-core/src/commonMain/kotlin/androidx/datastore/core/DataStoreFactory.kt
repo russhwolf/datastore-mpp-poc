@@ -22,7 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
-import okio.Filesystem
+import okio.FileSystem
 import okio.Path
 import kotlin.jvm.JvmOverloads
 
@@ -60,8 +60,8 @@ public object DataStoreFactory {
         corruptionHandler: ReplaceFileCorruptionHandler<T>? = null,
         migrations: List<DataMigration<T>> = listOf(),
         scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-        filesystem: Filesystem = Filesystem.SYSTEM,
-        produceFile: (Filesystem) -> Path
+        filesystem: FileSystem = FileSystem.SYSTEM,
+        produceFile: (FileSystem) -> Path
     ): DataStore<T> =
         SingleProcessDataStore(
             produceFile = produceFile,

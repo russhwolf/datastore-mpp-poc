@@ -41,7 +41,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.Buffer
-import okio.Filesystem
+import okio.FileSystem
 import okio.IOException
 import okio.Path
 import okio.Path.Companion.toPath
@@ -62,7 +62,7 @@ private class DataAndHash<T>(val value: T, val hashCode: Int) {
  */
 @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class, FlowPreview::class)
 internal class SingleProcessDataStore<T>(
-    private val produceFile: (Filesystem) -> Path,
+    private val produceFile: (FileSystem) -> Path,
     private val serializer: Serializer<T>,
     /**
      * The list of initialization tasks to perform. These tasks will be completed before any data
@@ -74,7 +74,7 @@ internal class SingleProcessDataStore<T>(
     initTasksList: List<suspend (api: InitializerApi<T>) -> Unit> = emptyList(),
     private val corruptionHandler: CorruptionHandler<T> = NoOpCorruptionHandler<T>(),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-    private val filesystem: Filesystem = Filesystem.SYSTEM
+    private val filesystem: FileSystem = FileSystem.SYSTEM
 ) : DataStore<T> {
 
     override val data: Flow<T> = flow {
